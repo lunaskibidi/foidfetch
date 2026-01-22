@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+
+# import modules 
+import os
+import subprocess
+
+## raw value collection
+
+# get uptime
+with open("/proc/uptime") as f:
+    uptime_seconds = float(f.read().split()[0])
+
+# get cpu model
+with open("/proc/cpuinfo") as f:
+    for line in f.read().splitlines():
+        if "model name" in line:
+            cpumodel = (line.split(': ')[1])
+        elif "cpu cores" in line:
+            cpucores = (line.split(': ')[1])
+
+# get total and used memory
+with open('/proc/meminfo') as f:
+    for line in f.read().splitlines():
+        if 'MemTotal' in line:
+            totalmemkbs = (line.split(":")[1].strip().split(" ")[0])
+        elif 'MemAvailable' in line:
+            freememkbs = (line.split(":")[1].strip().split(" ")[0])
+            
+# get os version
+
+with open("/etc/os-release") as f:
+    for line in f:
+        if line.startswith("NAME="):
+            osname = line.strip().split('=')[1].strip('"')
+        elif line.startswith("VERSION="):
+            osversion = line.strip().split('=')[1].strip('"')
+
+
+# check if theres gpus
+
+output = subprocess.check_output(["lspci"]).decode()
+
+gpus = []
+for line in output.splitlines():
+    if "VGA compatible controller" in line:
+        gpus.append(line.split(": ")[1])
+
+# handle no gpu
+if gpus:
+    gpuinfo = ", ".join(gpus)
+else:
+    gpuinfo = "No GPU detected"
+
+## formatting
+
+# uptime
+
+uptime_seconds = int(uptime_seconds) # rounds up uptime
+
+def formattime(uptime_seconds): # converts seconds into units
+    days = uptime_seconds // 86400
+    leftover = uptime_seconds % 86400
+    hours = leftover // 3600
+    leftover = leftover % 3600
+    minutes = leftover // 60
+    leftover = leftover % 60
+    seconds = leftover
+    
+    output = []
+
+    for value, label in zip([days, hours, minutes, seconds], ['days','hours','minutes','seconds']):
+        if value > 0:
+            output.append(f"{value} {label}") # removes below 1 units, converts variables into a single list
+
+    return output # returns said list
+
+time = formattime(uptime_seconds) # exports above list to outside of the function
+
+# memory
+
+totalmem = str(round(int(totalmemkbs) / 1024 / 1024 , 1 ))
+usedmem = str(round( (int(totalmemkbs) - int(freememkbs)) / 1024 / 1024 , 1 ))
+
+
+## colorss
+
+MAGENTA= "\033[35m"
+RESET  = "\033[0m"  # resets color back to default
+
+
+## printing
+
+ascii_art = """\
+⢿⣿⣿⣧⣿⣿⡿⠿⠛⣣⣤⡄⠠⢀⣼⣿⠟⠀⣸⣿⢃⠟⡃⠀⢀⣿⠟⠀⠀⡼⣸⣿⢘⡿⠃⢀⡟⠀⠘⢧⢸⢻⣿⣿⠀⠠⡀⠀⠄⡀⠜⡸⢠⡘⠤⡘⠿⣿⣼⣿⣻⠿⣟⣿⣿
+⣷⣶⣤⣖⠒⠐⢊⣵⣾⣿⣿⠷⢀⣾⠟⣡⢈⢡⣿⠃⠰⠋⡠⣺⠀⡋⢠⠆⠰⣸⡿⢡⠏⢁⡴⢈⠄⢰⡆⢳⠀⢬⡙⢿⠀⣧⡈⠦⡀⠐⡌⡑⢆⡒⠐⣌⡒⢬⡙⢿⣿⣿⣱⢿⣿
+⣿⣿⠟⡁⢂⡴⠿⠛⢋⠉⡀⢠⡾⠋⠰⢀⡾⢸⡏⠀⠃⣼⡾⠟⠀⡁⠛⣵⠀⡟⠀⢃⣴⡿⢃⡴⢠⣿⣿⣄⠂⢘⣿⠆⠀⣿⣿⡆⠈⠃⠔⡉⢆⠸⡁⢌⢻⣤⠹⣷⣎⡻⣿⣿⣬
+⣿⠋⠤⣁⠢⠐⠢⠑⢠⠂⢁⡾⠁⠀⢀⡟⡃⢸⡁⠈⣼⢋⣴⡿⡆⠀⠀⣿⡇⢡⣾⣿⣿⣵⣏⣴⠟⠉⠉⠛⠆⡀⡿⠁⠀⣿⣿⣇⠀⠈⡐⢀⠢⢄⡁⠂⢆⠹⣷⣌⢿⣷⣮⢻⣿
+⠃⡜⠐⡠⠋⣀⠂⡜⠢⠈⠌⠁⠀⠌⢘⣼⡇⠐⠀⢸⠇⣼⡟⠀⠀⠀⠀⣿⣷⣿⣿⣿⣿⣿⣿⣿⣿⠻⠇⠁⢠⡀⠘⠀⠸⣿⣿⣿⡄⠀⠐⠠⠐⢢⠀⠈⠆⡁⢈⠣⠲⡹⣿⣧⡻
+⣠⡞⢘⣔⣠⢀⡜⢬⠁⢂⠀⢠⠃⠀⣊⠟⡠⠀⠄⢸⣷⣿⣧⠰⣴⡄⣱⣿⣿⣿⣿⣿⣿⣿⣿⣿⠇⠀⠀⠀⠀⣷⠀⠂⡇⡟⣿⢸⣷⡀⠈⠄⡁⠆⠈⠄⠘⡀⢀⠈⠅⠒⣈⠻⣷
+⣿⣱⣿⣿⣏⣰⣊⠒⠀⠂⡜⠰⢀⡾⠏⡰⠁⠀⠀⢸⣿⣿⣿⣷⣶⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡄⢠⣀⣠⢃⣿⠀⣸⢑⡷⢻⡄⠻⣧⠀⡀⠈⢀⠐⡈⠄⠀⠂⡄⠈⠠⠀⢣⠹
+⣿⣿⣿⣿⣿⣿⣿⣀⡀⠘⠄⡵⠋⡴⢘⠀⠀⡀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣭⣴⣿⡟⣰⠯⣼⡟⢸⣇⠀⠙⣷⡀⠆⠀⢂⠐⢀⠀⠡⠄⡘⡀⠄⣦⡑
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⠘⣠⢄⡷⠁⠠⠀⠄⠀⠘⣿⣿⣿⣿⣿⣿⡏⢡⣄⣢⣍⠙⠻⣿⣿⣿⣿⣿⣿⣿⠟⢈⣾⣱⣿⠃⢸⣹⠀⡂⠈⠙⠦⣀⠠⢠⢿⣷⣈⣄⠐⡡⢀⡿⢿
+⣿⣿⣿⣿⣿⣿⣿⣿⡟⢀⣽⣯⢸⡓⢀⠖⠀⠠⡍⡄⠈⠻⣿⣿⣿⣿⣧⠻⣜⡷⣞⡿⢡⣿⣿⣙⢛⡛⢍⣠⢔⣾⣿⡿⠃⠀⡌⡇⠇⡐⠁⢂⠆⠀⣤⡹⣴⠙⠧⢹⣧⢶⡌⢻⣇
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣴⣿⣿⠀⡇⢪⠜⣢⢓⡘⢬⠱⡠⠈⠛⢿⣿⣿⣷⣮⣭⣭⣶⣿⣿⣿⣿⣿⣿⣿⢫⢞⡷⠟⠀⠐⢡⠀⡇⠂⠀⢌⠒⡘⢀⠘⣷⡐⠆⡀⢀⠹⠞⡇⣘⣼
+"""
+
+lines = ascii_art.splitlines()
+info = [
+    f"{MAGENTA}foidfetch{RESET}",
+    "Running " + osname + " " + osversion,
+    f"{MAGENTA}User: {RESET}" + os.environ['USER'],
+    f"{MAGENTA}Hostname: {RESET}" + os.uname().nodename,
+    f"{MAGENTA}Uptime: {RESET}" + ", ".join(time),
+    f"{MAGENTA}GPU: {RESET}" + gpuinfo,
+    f"{MAGENTA}CPU: {RESET}" + cpumodel,
+    f"{MAGENTA}CPU Cores: {RESET}" + cpucores,
+    f"{MAGENTA}Memory usage: {RESET}" + usedmem + ' / ' + totalmem + ' GB',
+    f"{MAGENTA}Display Manager: {RESET}" + os.environ.get('XDG_SESSION_TYPE', 'N/A')
+]
+
+# pad shorter list if ascii has fewer lines than info
+for a, i in zip(lines, info):
+    print(f"{a:<12} {i}")  # left-align ascii art
+
