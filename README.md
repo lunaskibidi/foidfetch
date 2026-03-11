@@ -7,4 +7,5 @@ polished gpu display being too big (still needs more work)
 installation
 
 sudo chmod +x ~/Downloads/foidfetch
+
 sudo mv ~/Downloads/foidfetch /usr/local/bin/
