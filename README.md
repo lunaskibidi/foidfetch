@@ -1,4 +1,10 @@
-THIS SUCKS!!!!!!!!!!
-i made this in a day cuz my brother needs python in a school assignment and i want to help him so this was my first project in this language yip[eeee ill learn more later its time to sshower for my job interview anyways have fun
+UPDATE 1.3 CHANGES
+ported entire thing to C so theres no more yucky python
+removed every comment
+added motd
+polished gpu display being too big (still needs more work)
 
-place in /usr/local/bin for system wide access
+installation
+
+sudo chmod +x ~/Downloads/foidfetch
+sudo mv ~/Downloads/foidfetch /usr/local/bin/
